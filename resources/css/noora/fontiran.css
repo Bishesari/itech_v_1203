@@ -1,0 +1,102 @@
+/**
+*
+*	Name:			Noora font family
+*	Version:		2
+*	Author:			Atefeh Mohammadi, Amin Abedi
+*	Vendor:			http://fontiran.com
+*	Copyright:		Commercial/Proprietary Software
+--------------------------------------------------------------------------------------
+فونت نورا یک نرم افزار مالکیتی محسوب می شود. جهت آگاهی از قوانین استفاده از این فونت ها لطفا به وب سایت (فونت ایران دات کام) مراجعه نمایید
+--------------------------------------------------------------------------------------
+Noora fonts are considered a proprietary software. To gain information about the laws regarding the use of these fonts, please visit www.fontiran.com
+--------------------------------------------------------------------------------------
+This set of fonts are used in this project under the license: (.....)
+------------------------------------------------------------------------------------- fonts/-
+*
+**/
+@font-face {
+	font-family: Noora;
+	font-style: normal;
+	font-weight: 200;
+	src: url('Noora-FD-ExtraLight.woff2') format('woff2')
+}
+@font-face {
+	font-family: Noora;
+	font-style: normal;
+	font-weight: 300;
+	src: url('Noora-FD-Light.woff2') format('woff2')
+}
+@font-face {
+	font-family: Noora;
+	font-style: normal;
+	font-weight: normal;
+	src: url('Noora-FD-Regular.woff2') format('woff2')
+}
+@font-face {
+	font-family: Noora;
+	font-style: normal;
+	font-weight: 500;
+	src: url('Noora-FD-Medium.woff2') format('woff2')
+}
+@font-face {
+	font-family: Noora;
+	font-style: normal;
+	font-weight: 600;
+	src: url('Noora-FD-SemiBold.woff2') format('woff2')
+}
+@font-face {
+	font-family: Noora;
+	font-style: normal;
+	font-weight: bold;
+	src: url('Noora-FD-Bold.woff2') format('woff2')
+}
+@font-face {
+	font-family: Noora;
+	font-style: normal;
+	font-weight: 800;
+	src: url('Noora-FD-ExtraBold.woff2') format('woff2')
+}
+
+
+@font-face {
+    font-family: Noora_Latin;
+    font-style: normal;
+    font-weight: 200;
+    src: url('Noora-ExtraLight.woff2') format('woff2')
+}
+@font-face {
+    font-family: Noora_Latin;
+    font-style: normal;
+    font-weight: 300;
+    src: url('Noora-Light.woff2') format('woff2')
+}
+@font-face {
+    font-family: Noora_Latin;
+    font-style: normal;
+    font-weight: normal;
+    src: url('Noora-Regular.woff2') format('woff2')
+}
+@font-face {
+    font-family: Noora_Latin;
+    font-style: normal;
+    font-weight: 500;
+    src: url('Noora-Medium.woff2') format('woff2')
+}
+@font-face {
+    font-family: Noora_Latin;
+    font-style: normal;
+    font-weight: 600;
+    src: url('Noora-SemiBold.woff2') format('woff2')
+}
+@font-face {
+    font-family: Noora_Latin;
+    font-style: normal;
+    font-weight: bold;
+    src: url('Noora-Bold.woff2') format('woff2')
+}
+@font-face {
+    font-family: Noora_Latin;
+    font-style: normal;
+    font-weight: 800;
+    src: url('Noora-ExtraBold.woff2') format('woff2')
+}
