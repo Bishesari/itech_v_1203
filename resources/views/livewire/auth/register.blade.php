@@ -1,6 +1,5 @@
 <?php
 
-use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Support\Facades\RateLimiter;
 use Livewire\Attributes\Layout;
 use Livewire\Volt\Component;
@@ -15,6 +14,13 @@ new #[Layout('components.layouts.auth')] class extends Component {
     public ?int $cooldown = null;
 
     public function check_data()
+    {
+        $this->modal('mobile_verify')->show();
+    }
+
+
+
+    public function sendOtp(): void
     {
         $cooldownKey = 'fp_sms_cooldown|' . $this->fingerprint;
         $limitKey = 'fp_sms_total|' . $this->fingerprint;
@@ -32,12 +38,7 @@ new #[Layout('components.layouts.auth')] class extends Component {
 
         RateLimiter::hit($cooldownKey, 120); // ۲ دقیقه
         RateLimiter::hit($limitKey, 3600 * 24); // مثلاً یک روز
-
         $this->updateCooldown();
-
-
-        $this->modal('mobile_verify')->show();
-
     }
 
     public function updateCooldown()
@@ -117,18 +118,44 @@ new #[Layout('components.layouts.auth')] class extends Component {
         <flux:link :href="route('login')" wire:navigate>{{ __('وارد شوید.') }}</flux:link>
     </div>
 
-    <flux:modal name="mobile_verify" class="md:w-96">
+    <!-- Mobile Verification Modal -->
+    <flux:modal name="mobile_verify" class="md:w-96" :dismissible="false">
         <div class="space-y-6">
             <div>
-                <flux:heading size="lg">Update profile</flux:heading>
-                <flux:text class="mt-2">Make changes to your personal details.</flux:text>
+                <flux:heading size="lg">{{__('تایید شماره موبایل')}}</flux:heading>
+                <flux:text class="mt-2">{{__('شماره موبایل خود را وارد نموده و دکمه ارسال پیامک را بزنید.')}}</flux:text>
             </div>
-            <flux:input label="Name" placeholder="Your name"/>
-            <flux:input label="Date of birth" type="date"/>
-            <div class="flex">
+
+            <form wire:submit="check_data" class="flex flex-col gap-6" autocomplete="off">
+
+                <!-- Mobile -->
+                <flux:input
+                    wire:model="mobile"
+                    :label="__('موبایل')"
+                    type="text"
+                    required
+                    autofocus
+                    placeholder="شماره موبایل">
+                    <x-slot name="iconTrailing">
+                        <flux:button wire:click="sendOtp" size="sm" variant="subtle" class="-mr-1" >{{__('ارسال پیامک')}}</flux:button>
+                    </x-slot>
+                </flux:input>
+
+                <!-- OTP -->
+                <flux:input
+                    class:input="text-center"
+                    wire:model="otp"
+                    :label="__('کدپیامکی')"
+                    type="text"
+                    required
+                    :placeholder="__('کد پیامکی')"
+                />
+
+                <div class="flex">
                 <flux:spacer/>
-                <flux:button type="submit" variant="primary">Save changes</flux:button>
-            </div>
+                <flux:button type="submit" variant="primary">{{__('تایید')}}</flux:button>
+                </div>
+            </form>
         </div>
     </flux:modal>
 </div>
