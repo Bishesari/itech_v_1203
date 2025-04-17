@@ -38,11 +38,11 @@ new #[Layout('components.layouts.auth')] class extends Component {
         }
 
         $parsGreenService = new ParsGreenService();
-//        $response = $parsGreenService->sendOtp($this->mobile, $otp);
-        $response = 1;
+//      $response = $parsGreenService->sendOtp($this->mobile, $otp);
+        $response = true;
         if ($response) {
             $this->modal('mobile_verify')->show();
-            RateLimiter::hit('a', 20);
+            RateLimiter::hit($limitKey, 3600 * 8);  // کلید تعداد ارسال تا 8 ساعت اعتبار دارد.
         } else {
             //
         }
