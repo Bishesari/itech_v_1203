@@ -1,6 +1,7 @@
 <?php
 
 use App\Rules\NCode;
+use App\Services\ParsGreenService;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
@@ -11,7 +12,6 @@ new #[Layout('components.layouts.auth')] class extends Component {
     public string $f_name_fa = '';
     public string $l_name_fa = '';
     public string $n_code = '';
-    public $title = '';
     public string $mobile = '';
     public string $fingerprint = '';
     public ?int $cooldown = null;
@@ -26,9 +26,27 @@ new #[Layout('components.layouts.auth')] class extends Component {
         ];
     }
 
-    public function check_data()
+    public function check_data(): void
     {
         $this->validate();
+        $otp = NumericOTP(6);
+        $limitKey = 'fp_sms_total|' . $this->fingerprint;
+
+        if (RateLimiter::attempts($limitKey) >= 5) {
+            $this->addError('phone', 'سقف ارسال پیامک برای این دستگاه پر شده است.');
+            return;
+        }
+
+        $parsGreenService = new ParsGreenService();
+//        $response = $parsGreenService->sendOtp($this->mobile, $otp);
+        $response = 1;
+        if ($response) {
+            $this->modal('mobile_verify')->show();
+            RateLimiter::hit('a', 20);
+        } else {
+            //
+        }
+
 
         $this->modal('mobile_verify')->show();
     }
@@ -39,7 +57,6 @@ new #[Layout('components.layouts.auth')] class extends Component {
         $this->validate(['mobile' => 'required|starts_with:09|digits:11']);
 
         $cooldownKey = 'fp_sms_cooldown|' . $this->fingerprint;
-        $limitKey = 'fp_sms_total|' . $this->fingerprint;
 
         if (RateLimiter::tooManyAttempts($cooldownKey, 1)) {
             $this->updateCooldown();
@@ -47,13 +64,10 @@ new #[Layout('components.layouts.auth')] class extends Component {
             return;
         }
 
-        if (RateLimiter::attempts($limitKey) >= 5) {
-            $this->addError('phone', 'سقف ارسال پیامک برای این دستگاه پر شده است.');
-            return;
-        }
+
 
         RateLimiter::hit($cooldownKey, 90); // 90 ثانیه
-        RateLimiter::hit($limitKey, 3600 * 24); // مثلاً یک روز
+
         $this->updateCooldown();
     }
 

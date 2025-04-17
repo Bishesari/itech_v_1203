@@ -30,7 +30,12 @@
             "App\\": "app/",
             "Database\\Factories\\": "database/factories/",
             "Database\\Seeders\\": "database/seeders/"
-        }
+        },
+        "files": [
+            "app/Functions/formats.php",
+            "app/Functions/jdf.php",
+            "app/Functions/random_key_generate.php"
+        ]
     },
     "autoload-dev": {
         "psr-4": {
