@@ -1,6 +1,8 @@
 <?php
 
+use App\Rules\NCode;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
 use Livewire\Volt\Component;
 
@@ -9,19 +11,33 @@ new #[Layout('components.layouts.auth')] class extends Component {
     public string $f_name_fa = '';
     public string $l_name_fa = '';
     public string $n_code = '';
+    public $title = '';
     public string $mobile = '';
     public string $fingerprint = '';
     public ?int $cooldown = null;
 
+    protected function rules(): array
+    {
+        return [
+            'f_name_fa' => ['required', 'string', 'min:2'],
+            'l_name_fa' => ['required', 'string', 'min:2'],
+            'n_code' => ['required', 'digits:10', new NCode, Rule::unique('profiles', 'n_code')],
+            'mobile' => ['required', 'starts_with:09', 'digits:11']
+        ];
+    }
+
     public function check_data()
     {
+        $this->validate();
+
         $this->modal('mobile_verify')->show();
     }
 
 
-
     public function sendOtp(): void
     {
+        $this->validate(['mobile' => 'required|starts_with:09|digits:11']);
+
         $cooldownKey = 'fp_sms_cooldown|' . $this->fingerprint;
         $limitKey = 'fp_sms_total|' . $this->fingerprint;
 
@@ -36,12 +52,12 @@ new #[Layout('components.layouts.auth')] class extends Component {
             return;
         }
 
-        RateLimiter::hit($cooldownKey, 120); // ۲ دقیقه
+        RateLimiter::hit($cooldownKey, 90); // 90 ثانیه
         RateLimiter::hit($limitKey, 3600 * 24); // مثلاً یک روز
         $this->updateCooldown();
     }
 
-    public function updateCooldown()
+    public function updateCooldown(): void
     {
         $this->cooldown = RateLimiter::availableIn('fp_sms_cooldown|' . $this->fingerprint);
     }
@@ -54,16 +70,9 @@ new #[Layout('components.layouts.auth')] class extends Component {
     <div class="text-red-500">{{ $message }}</div>
     @enderror
 
-    <input type="text" wire:model="fingerprint" placeholder="Fingerprint" class="border p-1 rounded">
-
-    <button wire:click="sendVerificationCode"
-            @if($cooldown > 0) disabled @endif
-            class="bg-blue-500 text-white px-4 py-2 rounded">
-        ارسال پیامک
-    </button>
 
     @if ($cooldown > 0)
-        <div wire:poll.1s="updateCooldown" class="mt-2 text-sm text-gray-600">
+        <div class="mt-2 text-sm text-gray-600">
             لطفاً {{ $cooldown }} ثانیه صبر کنید تا بتوانید دوباره پیامک ارسال کنید.
         </div>
     @endif
@@ -74,40 +83,41 @@ new #[Layout('components.layouts.auth')] class extends Component {
     <!-- Session Status -->
     <x-auth-session-status class="text-center" :status="session('status')"/>
 
-    <form wire:submit="check_data" class="flex flex-col gap-6" autocomplete="off">
+    <form wire:submit="check_data" class="flex flex-col gap-5" autocomplete="off">
+
         <!-- First Name -->
-        <flux:input
-            class:input="text-center"
-            wire:model="f_name_fa"
-            :label="__('نام')"
-            type="text"
-            required
-            autofocus
-            :placeholder="__('نام (فارسی)')"
-        />
+        <flux:field>
+            <flux:label badge="الزامی">{{__('نام')}}</flux:label>
+            <flux:input type="text" required autofocus class:input="text-center" wire:model="f_name_fa"/>
+            <flux:error name="f_name_fa"/>
+        </flux:field>
 
         <!-- Last Name -->
-        <flux:input
-            class:input="text-center"
-            wire:model="l_name_fa"
-            :label="__('نام خانوادگی')"
-            type="text"
-            required
-            :placeholder="__('نام خانوادگی (فارسی)')"
-        />
+        <flux:field>
+            <flux:label badge="الزامی">{{__('نام خانوادگی')}}</flux:label>
+            <flux:input type="text" required class:input="text-center" wire:model="l_name_fa"/>
+            <flux:error name="l_name_fa"/>
+        </flux:field>
 
         <!-- National Code -->
-        <flux:input
-            class:input="text-center"
-            wire:model="n_code"
-            :label="__('کدملی')"
-            type="text"
-            required
-            :placeholder="__('کد ملی')"
-        />
+        <flux:field>
+            <flux:label badge="الزامی">{{__('کدملی')}}</flux:label>
+            <flux:input type="text" required class:input="text-center" wire:model="n_code" style="direction:ltr"
+                        maxlength="10"/>
+            <flux:error name="n_code"/>
+        </flux:field>
+
+        <!-- Mobile -->
+        <flux:field>
+            <flux:label badge="الزامی">{{__('شماره موبایل')}}</flux:label>
+            <flux:input type="text" required class:input="text-center" wire:model="mobile" style="direction:ltr"
+                        maxlength="11"/>
+            <flux:error name="mobile"/>
+        </flux:field>
+
 
         <div class="flex items-center justify-end">
-            <flux:button type="submit" variant="primary" class="w-full">
+            <flux:button type="submit" variant="primary" class="w-full cursor-pointer">
                 {{ __('ثبت نام') }}
             </flux:button>
         </div>
@@ -123,38 +133,72 @@ new #[Layout('components.layouts.auth')] class extends Component {
         <div class="space-y-6">
             <div>
                 <flux:heading size="lg">{{__('تایید شماره موبایل')}}</flux:heading>
-                <flux:text class="mt-2">{{__('شماره موبایل خود را وارد نموده و دکمه ارسال پیامک را بزنید.')}}</flux:text>
+                <flux:text
+                    class="mt-2">{{__('موبایل خود را وارد نموده و دکمه ارسال پیامک را بزنید.')}}</flux:text>
             </div>
 
-            <form wire:submit="check_data" class="flex flex-col gap-6" autocomplete="off">
+            <form wire:submit="sendOtp" class="flex flex-col gap-6" autocomplete="off">
 
                 <!-- Mobile -->
-                <flux:input
-                    wire:model="mobile"
-                    :label="__('موبایل')"
-                    type="text"
-                    required
-                    autofocus
-                    placeholder="شماره موبایل">
-                    <x-slot name="iconTrailing">
-                        <flux:button wire:click="sendOtp" size="sm" variant="subtle" class="-mr-1" >{{__('ارسال پیامک')}}</flux:button>
-                    </x-slot>
-                </flux:input>
+                <flux:input.group>
+                    <flux:input
+                        maxlength="11"
+                        class:input="text-center"
+                        wire:model="mobile"
+                        type="text"
+                        autofocus
+                        placeholder="شماره موبایل"/>
 
-                <!-- OTP -->
-                <flux:input
-                    class:input="text-center"
-                    wire:model="otp"
-                    :label="__('کدپیامکی')"
-                    type="text"
-                    required
-                    :placeholder="__('کد پیامکی')"
-                />
+                    @if($cooldown > 0)
+                        <flux:button wire:poll.1s="updateCooldown" style="width:150px">
+                            {{$cooldown}} {{__('ثانیه')}}
+                        </flux:button>
+                    @else
+                        <flux:button type="submit" style="cursor:pointer;">
+                            {{__('ارسال پیامک')}}
+                        </flux:button>
+                    @endif
+                </flux:input.group>
+            </form>
 
-                <div class="flex">
+            <form wire:submit="register" class="flex flex-col gap-6" autocomplete="off">
+                <!-- Mobile -->
+                <flux:input.group style="direction:ltr">
+                    @if($cooldown > 0)
+                        <flux:button wire:poll.1s="updateCooldown">
+                            <span style="direction:rtl">{{$cooldown}} {{__('ثانیه')}}</span>
+                        </flux:button>
+                    @else
+                        <flux:button type="submit" style="cursor:pointer; width:150px">
+                            {{__('تایید')}}
+                        </flux:button>
+                    @endif
+
+                    <flux:input
+                        maxlength="11"
+                        class:input="text-center"
+                        wire:model="otp"
+                        type="text"
+                        autofocus
+                        placeholder="کد پیامکی"/>
+
+                </flux:input.group>
+            </form>
+
+            <!-- OTP -->
+            <flux:input
+                class:input="text-center"
+                wire:model="otp"
+                :label="__('کدپیامکی')"
+                type="text"
+                required
+                :placeholder="__('کد پیامکی')"
+            />
+
+            <div class="flex">
                 <flux:spacer/>
                 <flux:button type="submit" variant="primary">{{__('تایید')}}</flux:button>
-                </div>
+            </div>
             </form>
         </div>
     </flux:modal>
