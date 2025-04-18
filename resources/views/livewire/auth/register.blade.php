@@ -3,8 +3,10 @@
 use App\Rules\NCode;
 use App\Services\ParsGreenService;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Request;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Locked;
 use Livewire\Volt\Component;
 
 new #[Layout('components.layouts.auth')] class extends Component {
@@ -15,6 +17,11 @@ new #[Layout('components.layouts.auth')] class extends Component {
     public string $mobile = '';
     public string $fingerprint = '';
     public ?int $cooldown = null;
+
+
+
+
+
 
     protected function rules(): array
     {
@@ -28,12 +35,24 @@ new #[Layout('components.layouts.auth')] class extends Component {
 
     public function check_data(): void
     {
-        $this->validate();
+        $ip = Request::ip();
         $otp = NumericOTP(6);
-        $limitKey = 'fp_sms_total|' . $this->fingerprint;
 
-        if (RateLimiter::attempts($limitKey) >= 5) {
-            $this->addError('phone', 'سقف ارسال پیامک برای این دستگاه پر شده است.');
+        $total_fp_sms_sent_key = 'total_fp_sms_sent|' . $this->fingerprint;
+        $fp_sms_cool_down_key = 'fp_sms_cool_down|' . $this->fingerprint;
+        $total_ip_sms_sent_key = 'total_ip_sms_sent|' . $ip;
+        $registration_mobile_key = 'registration_mobile|' . $this->mobile;
+        $registration_otp_key = 'registration_otp|' . $otp;
+        $this->validate();
+
+
+        if (RateLimiter::attempts($total_fp_sms_sent_key) >= 5) {
+            $this->addError('total_fp_sms_sent', 'صقف ارسال پیامک برای این مرورگر پرشده است.');
+            return;
+        }
+
+        if (RateLimiter::attempts($total_ip_sms_sent_key) >= 20) {
+            $this->addError('total_ip_sms_sent', 'صقف ارسال پیامک برای این آی پی پرشده است.');
             return;
         }
 
@@ -42,9 +61,15 @@ new #[Layout('components.layouts.auth')] class extends Component {
         $response = true;
         if ($response) {
             $this->modal('mobile_verify')->show();
-            RateLimiter::hit($limitKey, 3600 * 8);  // کلید تعداد ارسال تا 8 ساعت اعتبار دارد.
+            RateLimiter::hit($total_fp_sms_sent_key, 3600 * 8);  // کلید تعداد ارسال تا 8 ساعت اعتبار دارد.
+            RateLimiter::hit($total_ip_sms_sent_key, 3600 * 24); // 1 روز
+            RateLimiter::hit($fp_sms_cool_down_key, 90); // 90 ثانیه
+            RateLimiter::hit($registration_mobile_key, 90);
+            RateLimiter::hit($registration_otp_key, 90);
+
         } else {
-            //
+            $this->addError('sms_send_problem', 'مشکلی در ارسال پیامک پیش آمده است. بعد از لحضاتی مجدد تلاش کنید.');
+            return;
         }
 
 
@@ -56,7 +81,6 @@ new #[Layout('components.layouts.auth')] class extends Component {
     {
         $this->validate(['mobile' => 'required|starts_with:09|digits:11']);
 
-        $cooldownKey = 'fp_sms_cooldown|' . $this->fingerprint;
 
         if (RateLimiter::tooManyAttempts($cooldownKey, 1)) {
             $this->updateCooldown();
@@ -64,9 +88,6 @@ new #[Layout('components.layouts.auth')] class extends Component {
             return;
         }
 
-
-
-        RateLimiter::hit($cooldownKey, 90); // 90 ثانیه
 
         $this->updateCooldown();
     }
@@ -79,18 +100,6 @@ new #[Layout('components.layouts.auth')] class extends Component {
 
 }; ?>
 <div class="flex flex-col gap-6">
-
-    @error('phone')
-    <div class="text-red-500">{{ $message }}</div>
-    @enderror
-
-
-    @if ($cooldown > 0)
-        <div class="mt-2 text-sm text-gray-600">
-            لطفاً {{ $cooldown }} ثانیه صبر کنید تا بتوانید دوباره پیامک ارسال کنید.
-        </div>
-    @endif
-
 
     <x-auth-header :title="__('ایجاد حساب')" :description="__('اطلاعات شخصی را جهت ثبت نام وارد کنید.')"/>
 
