@@ -18,11 +18,6 @@ new #[Layout('components.layouts.auth')] class extends Component {
     public string $fingerprint = '';
     public ?int $cooldown = null;
 
-
-
-
-
-
     protected function rules(): array
     {
         return [
@@ -35,6 +30,8 @@ new #[Layout('components.layouts.auth')] class extends Component {
 
     public function check_data(): void
     {
+        $this->validate();
+
         $ip = Request::ip();
         $otp = NumericOTP(6);
 
@@ -43,16 +40,15 @@ new #[Layout('components.layouts.auth')] class extends Component {
         $total_ip_sms_sent_key = 'total_ip_sms_sent|' . $ip;
         $registration_mobile_key = 'registration_mobile|' . $this->mobile;
         $registration_otp_key = 'registration_otp|' . $otp;
-        $this->validate();
 
 
         if (RateLimiter::attempts($total_fp_sms_sent_key) >= 5) {
-            $this->addError('total_fp_sms_sent', 'صقف ارسال پیامک برای این مرورگر پرشده است.');
+            $this->addError('total_fp_sms_sent', 'سقف ارسال پیامک برای این مرورگر پرشده است.');
             return;
         }
 
         if (RateLimiter::attempts($total_ip_sms_sent_key) >= 20) {
-            $this->addError('total_ip_sms_sent', 'صقف ارسال پیامک برای این آی پی پرشده است.');
+            $this->addError('total_ip_sms_sent', 'سقف ارسال پیامک برای این آی پی پرشده است.');
             return;
         }
 
