@@ -2,7 +2,6 @@
 
 use App\Rules\NCode;
 use App\Services\ParsGreenService;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Request;
 use Illuminate\Validation\Rule;
@@ -16,7 +15,6 @@ new #[Layout('components.layouts.auth')] class extends Component {
     public string $n_code = '';
     public string $mobile = '';
     public string $fingerprint = '';
-    public string $u_otp = '';
     public ?int $cooldown = null;
 
     protected function rules(): array
@@ -31,71 +29,81 @@ new #[Layout('components.layouts.auth')] class extends Component {
 
     public function check_data(): void
     {
-
         $this->validate();
 
         $ip = Request::ip();
-        $total_fp_sms_sent_key = 'total_fp_sms_sent_' . $this->fingerprint;
-        $total_ip_sms_sent_key = 'total_ip_sms_sent_' . $ip;
-        $cooldown_key = 'register_cooldown_'.$this->fingerprint;
+        $otp = NumericOTP(6);
+
+        $total_fp_sms_sent_key = 'total_fp_sms_sent|' . $this->fingerprint;
+        $fp_sms_cool_down_key = 'fp_sms_cool_down|' . $this->fingerprint;
+        $total_ip_sms_sent_key = 'total_ip_sms_sent|' . $ip;
+        $registration_mobile_key = 'registration_mobile|' . $this->mobile;
+        $registration_otp_key = 'registration_otp|' . $otp;
+
 
         if (RateLimiter::attempts($total_fp_sms_sent_key) >= 5) {
             $this->addError('total_fp_sms_sent', 'سقف ارسال پیامک برای این مرورگر پرشده است.');
             return;
         }
+
         if (RateLimiter::attempts($total_ip_sms_sent_key) >= 20) {
             $this->addError('total_ip_sms_sent', 'سقف ارسال پیامک برای این آی پی پرشده است.');
             return;
         }
 
+        $parsGreenService = new ParsGreenService();
 
         if ($this->cooldown > 0){
-            $this->addError('OTP_is_valid_yet', 'کد ارسال شده هنوز اعتبار دارد.');
+            $this->updateCooldown();
         }
         else{
-            $parsGreenService = new ParsGreenService();
-            $otp = NumericOTP(6);
-
-            //$response = $parsGreenService->sendOtp($this->mobile, $otp);
+            //      $response = $parsGreenService->sendOtp($this->mobile, $otp);
             $response = true;
-            if ($response) {
-                RateLimiter::hit($total_fp_sms_sent_key, 3600);  // کلید تعداد ارسال تا 1 ساعت اعتبار دارد.
-                RateLimiter::hit($total_ip_sms_sent_key, 3600 * 24); // 1 روز
-                RateLimiter::hit($cooldown_key, 90);
-                Cache::put('fp_register_otp_'.$this->fingerprint, $otp, 90);
-                Cache::put('fp_register_mobile_'.$this->fingerprint, $this->mobile, 90);
-            }
-            else {
-                $this->addError('sms_send_problem', 'مشکلی در ارسال پیامک پیش آمده است. بعد از لحضاتی مجدد تلاش کنید.');
-                return;
-            }
+
         }
-        $this->update_cooldown();
+
+
+        if ($response) {
+            $this->modal('mobile_verify')->show();
+            RateLimiter::hit($total_fp_sms_sent_key, 3600);  // کلید تعداد ارسال تا 1 ساعت اعتبار دارد.
+            RateLimiter::hit($total_ip_sms_sent_key, 3600 * 24); // 1 روز
+            RateLimiter::hit($fp_sms_cool_down_key, 90); // 90 ثانیه
+            RateLimiter::hit($registration_mobile_key, 90);
+            RateLimiter::hit($registration_otp_key, 90);
+
+        } else {
+            $this->addError('sms_send_problem', 'مشکلی در ارسال پیامک پیش آمده است. بعد از لحضاتی مجدد تلاش کنید.');
+            return;
+        }
+
+
         $this->modal('mobile_verify')->show();
     }
 
-    public function register(): void
+    public function register()
     {
-        // u_otp validation
-        $this->validate(['u_otp' => 'required|digits:6']);
 
-        if ($this->mobile != Cache::get('fp_register_mobile_'.$this->fingerprint)){
-            $this->addError('mobile_changed', 'شماره موبایل درج شده تغییر کرده است.');
-            return;
-        }
-        if ($this->u_otp != Cache::get('fp_register_otp_'.$this->fingerprint)){
-            $this->addError('incorrect_otp', 'کد وارد شده اشتباه است.');
-            return;
-        }
-        // User Registration
     }
 
-    public function update_cooldown(): void
+
+    public function sendOtp(): void
     {
-        $this->cooldown = RateLimiter::availableIn('register_cooldown_'.$this->fingerprint);
-        if ($this->cooldown <= 0){
-            $this->modal('mobile_verify')->close();
+        $this->validate(['mobile' => 'required|starts_with:09|digits:11']);
+
+
+        if (RateLimiter::tooManyAttempts($cooldownKey, 1)) {
+            $this->updateCooldown();
+            $this->addError('phone', 'لطفاً ' . $this->cooldown . ' ثانیه صبر کنید.');
+            return;
         }
+
+
+        $this->updateCooldown();
+    }
+
+    public function updateCooldown(): void
+    {
+        $this->cooldown = RateLimiter::availableIn('fp_sms_cooldown|' . $this->fingerprint);
     }
 
 
@@ -146,38 +154,41 @@ new #[Layout('components.layouts.auth')] class extends Component {
             </flux:button>
         </div>
     </form>
+
     <div class="space-x-1 rtl:space-x-reverse text-center text-sm text-zinc-600 dark:text-zinc-400">
         {{ __('ثبت نام کرده اید؟') }}
         <flux:link :href="route('login')" wire:navigate>{{ __('وارد شوید.') }}</flux:link>
     </div>
 
-
     <!--------- Mobile Verification Modal --------->
     <flux:modal name="mobile_verify" class="md:w-96" :dismissible="false">
         <div class="space-y-6">
             <div>
-                <flux:heading size="lg">{{__('تایید شماره موبایل')}} </flux:heading>
-                <flux:text class="mt-2" wire:poll.1s='update_cooldown'>{{__('تا')}} {{$cooldown}} {{__('ثانیه پیامک دریافتی از شماره')}}
-                    <span class="font-bold">{{$mobile}}</span> {{__('را وارد نمایید.')}}
-                </flux:text>
+                <flux:heading size="lg">{{__('تایید شماره موبایل')}}</flux:heading>
+                <flux:text
+                    class="mt-2">{{__('پیامک دریافتی از شماره')}} <span class="font-bold">{{$mobile}}</span> {{__('را وارد نمایید.')}}</flux:text>
             </div>
 
-            <form wire:submit="register" class="flex flex-col gap-5" autocomplete="off">
-                <!-- OTP -->
-                <flux:field>
-                    <flux:label badge="الزامی">{{__('کدپیامکی')}}</flux:label>
-                    <flux:input type="text" required autofocus class:input="text-center" wire:model="u_otp"/>
-                    <flux:error name="u_otp"/>
-                </flux:field>
+            <!-- OTP -->
+            <flux:input
+                class:input="text-center"
+                wire:model="otp"
+                :label="__('کدپیامکی')"
+                type="text"
+                required
+                autofocus
+                :placeholder="__('کد پیامکی')"
+            />
 
-                <div class="flex">
-                    <flux:spacer/>
-                    <flux:button type="submit" variant="primary">{{__('تکمیل ثبت نام')}}</flux:button>
-                </div>
+            <div class="flex">
+                <flux:spacer/>
+                <flux:button type="submit" variant="primary">{{__('تکمیل ثبت نام')}}</flux:button>
+            </div>
             </form>
         </div>
     </flux:modal>
 </div>
+
 
 @script
 <script>
@@ -195,14 +206,14 @@ new #[Layout('components.layouts.auth')] class extends Component {
         ctx.fillText('I-Tech!', 10, 10);
         const canvasData = canvas.toDataURL();
         fingerprintData = [
-        navigator.userAgent,
-        navigator.language,
-        screen.width,
-        screen.height,
-        screen.colorDepth,
-        navigator.hardwareConcurrency,
-        new Date().getTimezoneOffset(),
-        canvasData,
+            navigator.userAgent,
+            navigator.language,
+            screen.width,
+            screen.height,
+            screen.colorDepth,
+            navigator.hardwareConcurrency,
+            new Date().getTimezoneOffset(),
+            canvasData,
         ].join('_');
     }
 
@@ -217,6 +228,7 @@ new #[Layout('components.layouts.auth')] class extends Component {
         }
         fingerprint = Math.abs(hash).toString();
     }
+
     simpleHash();
     $wire.$set('fingerprint', fingerprint);
 </script>
